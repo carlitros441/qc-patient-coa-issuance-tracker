@@ -1,0 +1,12 @@
+node_modules
+dist
+.env
+.env.*
+!.env.example
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+vite-dev*.log
+functions/lib
+functions/node_modules
+service-account*.json

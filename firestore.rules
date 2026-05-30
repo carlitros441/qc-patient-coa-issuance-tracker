@@ -1,0 +1,50 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function role() {
+      return signedIn() && exists(/databases/$(database)/documents/settings/global)
+        ? get(/databases/$(database)/documents/settings/global).data.userRoles[request.auth.uid]
+        : null;
+    }
+
+    function isAdmin() {
+      return role() == "Admin";
+    }
+
+    function isQcUser() {
+      return role() in ["Admin", "QC User"];
+    }
+
+    function isViewer() {
+      return role() in ["Admin", "QC User", "Viewer"];
+    }
+
+    match /patients/{patientId} {
+      allow read: if isViewer();
+      allow create: if isQcUser()
+        && request.resource.data.patientId is string
+        && request.resource.data.patientId.size() <= 80
+        && request.resource.data.project is string
+        && request.resource.data.emailNotification.sent == false;
+      allow update: if isQcUser()
+        && request.resource.data.emailNotification.lastError == resource.data.emailNotification.lastError;
+      allow delete: if isAdmin();
+    }
+
+    match /settings/{settingId} {
+      allow read: if signedIn();
+      allow write: if isAdmin();
+    }
+
+    match /auditLogs/{logId} {
+      allow read: if isViewer();
+      allow create: if isQcUser();
+      allow update, delete: if false;
+    }
+  }
+}
