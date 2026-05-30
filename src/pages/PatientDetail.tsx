@@ -87,6 +87,28 @@ export function PatientDetail({ user }: { user: User }) {
     }
   }
 
+  function downloadOutlookDraft() {
+    if (!patient || !emailPreview) return;
+    const headers = [
+      "X-Unsent: 1",
+      `To: ${emailPreview.recipients.join(", ")}`,
+      `Subject: ${emailPreview.subject}`,
+      "MIME-Version: 1.0",
+      "Content-Type: text/plain; charset=utf-8",
+      "",
+      emailPreview.body
+    ];
+    const blob = new Blob([headers.join("\r\n")], { type: "message/rfc822;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `QC-CoA-${patient.patientId.replace(/[^a-z0-9-]/gi, "_")}.eml`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(url);
+  }
+
   return (
     <main className="page detail-grid">
       <section className="panel hero-panel">
@@ -148,7 +170,7 @@ export function PatientDetail({ user }: { user: User }) {
         <Modal
           title="Confirm Email Notification"
           onClose={() => setModalOpen(false)}
-          footer={<><button className="ghost" onClick={() => setModalOpen(false)}>Cancel</button><button className="primary" onClick={confirmSendEmail}>Confirm send</button></>}
+          footer={<><button className="ghost" onClick={() => setModalOpen(false)}>Cancel</button><button className="ghost" onClick={downloadOutlookDraft}>Download Outlook Draft</button><button className="primary" onClick={confirmSendEmail}>Confirm send</button></>}
         >
           <dl className="preview-list">
             <dt>Patient ID</dt><dd>{patient.patientId}</dd>
