@@ -34,6 +34,14 @@ export interface PatientWorkflow {
   report: AssignedWorkflowItem;
 }
 
+export interface CustomAssayWorkflow {
+  id: string;
+  name: string;
+  status: WorkflowStatus;
+  assignedTo: Assignee;
+  notes: string;
+}
+
 export interface EmailNotification {
   sent: boolean;
   status: EmailStatus;
@@ -55,6 +63,7 @@ export interface Patient {
   createdBy: string;
   updatedBy: string;
   workflow: PatientWorkflow;
+  customAssays?: CustomAssayWorkflow[];
   emailNotification: EmailNotification;
 }
 
@@ -62,6 +71,7 @@ export interface AppSettings {
   emailRecipients: string[];
   projects: string[];
   assignees: string[];
+  assayTemplates: string[];
   emailTemplate: string;
   userRoles?: Record<string, UserRole>;
 }

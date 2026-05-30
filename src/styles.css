@@ -156,6 +156,12 @@ textarea { resize: vertical; }
 .card-top p, .muted, .meta-line { color: var(--muted); }
 .badge-row { display: flex; flex-wrap: wrap; gap: 7px; }
 .meta-line { display: flex; justify-content: space-between; gap: 8px; font-size: 0.84rem; }
+.gating-line {
+  margin: 0;
+  color: var(--muted);
+  font-weight: 800;
+}
+.gating-line strong { color: #5f4591; }
 
 .badge { display: inline-flex; align-items: center; justify-content: center; }
 .status-not-started, .status-not-ready { background: #eceaf1; color: #665d72; }
@@ -236,6 +242,17 @@ textarea { resize: vertical; }
 .setup-panel .muted { line-height: 1.6; }
 .missing-list { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
 .missing-list code, .setup-panel code { background: #fbf7ff; border: 1px solid var(--line); border-radius: 10px; padding: 4px 7px; color: #5f4591; }
+.editable-list { display: grid; gap: 8px; }
+.editable-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 42px;
+  gap: 8px;
+  align-items: center;
+}
+.editable-row .icon-button {
+  display: grid;
+  place-items: center;
+}
 
 @media (max-width: 1000px) {
   .app-shell { grid-template-columns: 1fr; }

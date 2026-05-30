@@ -13,7 +13,7 @@ import {
 } from "firebase/firestore";
 import { db } from "../firebase";
 import { defaultWorkflow } from "../constants";
-import type { AuditLog, OverallStatus, Patient, PatientWorkflow, Project } from "../types";
+import type { AuditLog, CustomAssayWorkflow, OverallStatus, Patient, PatientWorkflow, Project } from "../types";
 import { buildEmailSubject, deriveOverallStatus } from "../utils/workflow";
 
 const patientsCollection = collection(db, "patients");
@@ -87,7 +87,7 @@ export async function updatePatientInfo(
   await logAudit(patient.id, "Updated patient information", "patient", { project: patient.project, notes: patient.notes }, input, input.userId);
 }
 
-export async function updateWorkflow(patient: Patient, workflow: PatientWorkflow, userId: string) {
+export async function updateWorkflow(patient: Patient, workflow: PatientWorkflow, userId: string, customAssays?: CustomAssayWorkflow[]) {
   const computedPatient = { ...patient, workflow };
   const ready = workflow.phenotyping.status === "Completed"
     && workflow.requestCells.status === "Completed"
@@ -98,13 +98,14 @@ export async function updateWorkflow(patient: Patient, workflow: PatientWorkflow
 
   await updateDoc(doc(db, "patients", patient.id), {
     workflow,
+    customAssays: customAssays ?? [],
     overallStatus: deriveOverallStatus(computedPatient),
     "emailNotification.status": ready ? "Ready to Send" : patient.emailNotification.sent ? "Sent" : "Not Ready",
     "emailNotification.subject": buildEmailSubject(patient),
     updatedAt: serverTimestamp(),
     updatedBy: userId
   });
-  await logAudit(patient.id, "Updated workflow", "workflow", patient.workflow, workflow, userId);
+  await logAudit(patient.id, "Updated workflow", "workflow", { workflow: patient.workflow, customAssays: patient.customAssays ?? [] }, { workflow, customAssays: customAssays ?? [] }, userId);
 }
 
 export async function logAudit(

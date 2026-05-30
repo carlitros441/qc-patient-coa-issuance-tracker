@@ -64,7 +64,7 @@ function Shell({ user }: AuthContextValue) {
       <aside className="sidebar">
         <div className="brand">
           <span className="brand-icon"><Sparkles size={20} /></span>
-          <span>QC CoA Tracker</span>
+          <span>Patient Tracker</span>
         </div>
         <nav>
           <NavLink to="/"><Home size={18} />Dashboard</NavLink>

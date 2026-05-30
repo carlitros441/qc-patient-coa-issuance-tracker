@@ -9,8 +9,8 @@ import { WORKFLOW_STATUSES, OVERALL_STATUSES } from "../constants";
 import { sendEmailNotification } from "../services/emailService";
 import { subscribeAuditLogs, subscribePatient, updatePatientInfo, updateWorkflow } from "../services/patientService";
 import { subscribeSettings } from "../services/settingsService";
-import type { AppSettings, AssignedWorkflowItem, AuditLog, Patient, PatientWorkflow, PhenotypingWorkflow, RequestCellsWorkflow, WorkflowStatus, XCelligenceWorkflow } from "../types";
-import { buildEmailBody, buildEmailSubject, calculateProgress, isReadyForEmail, pendingWorkflowSteps, workflowLabels } from "../utils/workflow";
+import type { AppSettings, AssignedWorkflowItem, AuditLog, CustomAssayWorkflow, Patient, PatientWorkflow, PhenotypingWorkflow, RequestCellsWorkflow, WorkflowStatus, XCelligenceWorkflow } from "../types";
+import { buildEmailBody, buildEmailSubject, calculateProgress, isReadyForEmail, mergeCustomAssays, pendingWorkflowSteps, workflowLabels } from "../utils/workflow";
 
 export function PatientDetail({ user }: { user: User }) {
   const { id } = useParams();
@@ -18,6 +18,7 @@ export function PatientDetail({ user }: { user: User }) {
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [workflowDraft, setWorkflowDraft] = useState<PatientWorkflow | null>(null);
+  const [customAssaysDraft, setCustomAssaysDraft] = useState<CustomAssayWorkflow[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -36,6 +37,11 @@ export function PatientDetail({ user }: { user: User }) {
       unsubSettings();
     };
   }, [id]);
+
+  useEffect(() => {
+    if (!patient || !settings) return;
+    setCustomAssaysDraft(mergeCustomAssays(patient.customAssays, settings.assayTemplates, settings.assignees));
+  }, [patient, settings]);
 
   const emailPreview = useMemo(() => {
     if (!patient) return null;
@@ -66,7 +72,7 @@ export function PatientDetail({ user }: { user: User }) {
 
   async function saveWorkflow() {
     if (!patient || !workflowDraft) return;
-    await updateWorkflow(patient, workflowDraft, user.uid);
+    await updateWorkflow(patient, workflowDraft, user.uid, customAssaysDraft);
     setMessage("Workflow saved.");
   }
 
@@ -126,7 +132,7 @@ export function PatientDetail({ user }: { user: User }) {
       <section className="panel">
         <h3>Patient Information</h3>
         <form className="two-column-form" onSubmit={saveInfo}>
-          <label>Project<input name="project" defaultValue={patient.project} /></label>
+          <label>Project<select name="project" defaultValue={patient.project}>{(settings?.projects ?? ["Co-Exist", "CARE"]).map((item) => <option key={item}>{item}</option>)}</select></label>
           <label>Overall status<select name="overallStatus" defaultValue={patient.overallStatus}>{OVERALL_STATUSES.map((item) => <option key={item}>{item}</option>)}</select></label>
           <label className="span-2">Notes<textarea name="notes" defaultValue={patient.notes} rows={3} /></label>
           <button className="primary" type="submit"><Save size={18} />Save info</button>
@@ -138,7 +144,13 @@ export function PatientDetail({ user }: { user: User }) {
           <h3>Workflow Tracking</h3>
           <button className="primary" type="button" onClick={saveWorkflow}><Save size={18} />Save workflow</button>
         </div>
-        <WorkflowEditor workflow={workflowDraft} setWorkflow={setWorkflowDraft} assignees={settings?.assignees ?? ["Magda", "Nisha"]} />
+        <WorkflowEditor
+          workflow={workflowDraft}
+          setWorkflow={setWorkflowDraft}
+          customAssays={customAssaysDraft}
+          setCustomAssays={setCustomAssaysDraft}
+          assignees={settings?.assignees ?? ["Magda", "Nisha"]}
+        />
       </section>
 
       <section className="panel email-panel">
@@ -189,10 +201,14 @@ export function PatientDetail({ user }: { user: User }) {
 function WorkflowEditor({
   workflow,
   setWorkflow,
+  customAssays,
+  setCustomAssays,
   assignees
 }: {
   workflow: PatientWorkflow;
   setWorkflow: (workflow: PatientWorkflow) => void;
+  customAssays: CustomAssayWorkflow[];
+  setCustomAssays: (assays: CustomAssayWorkflow[]) => void;
   assignees: string[];
 }) {
   return (
@@ -202,11 +218,20 @@ function WorkflowEditor({
       <SimpleSection title="XCelligence" item={workflow.xCelligence} onChange={(item) => setWorkflow({ ...workflow, xCelligence: item })} />
       <AssignedSection title="ELISA" item={workflow.elisa} assignees={assignees} onChange={(item) => setWorkflow({ ...workflow, elisa: item })} />
       <AssignedSection title="Report" item={workflow.report} assignees={assignees} onChange={(item) => setWorkflow({ ...workflow, report: item })} />
+      {customAssays.map((assay, index) => (
+        <AssignedSection
+          key={assay.id}
+          title={assay.name}
+          item={assay}
+          assignees={assignees}
+          onChange={(item) => setCustomAssays(customAssays.map((candidate, candidateIndex) => candidateIndex === index ? item : candidate))}
+        />
+      ))}
     </div>
   );
 }
 
-type DatedAssignedWorkflowItem = AssignedWorkflowItem | PhenotypingWorkflow | RequestCellsWorkflow;
+type DatedAssignedWorkflowItem = AssignedWorkflowItem | PhenotypingWorkflow | RequestCellsWorkflow | CustomAssayWorkflow;
 
 interface AssignedSectionProps<T extends DatedAssignedWorkflowItem> {
   title: string;

@@ -24,6 +24,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   emailRecipients: ["qc-coa-notifications@example.com"],
   projects: ["Co-Exist", "CARE"],
   assignees: ["Magda", "Nisha"],
+  assayTemplates: [],
   emailTemplate: EMAIL_TEMPLATE,
   userRoles: {}
 };
