@@ -40,7 +40,7 @@ export function PatientDetail({ user }: { user: User }) {
 
   useEffect(() => {
     if (!patient || !settings) return;
-    setCustomAssaysDraft(mergeCustomAssays(patient.customAssays, settings.assayTemplates, settings.assignees));
+    setCustomAssaysDraft(mergeCustomAssays(patient.customAssays, settings.workflowSteps, settings.assignees));
   }, [patient, settings]);
 
   const emailPreview = useMemo(() => {
@@ -54,8 +54,9 @@ export function PatientDetail({ user }: { user: User }) {
 
   if (!patient || !workflowDraft) return <main className="page"><div className="loading">Loading patient...</div></main>;
 
-  const ready = isReadyForEmail(patient);
-  const pending = pendingWorkflowSteps(patient);
+  const workflowSteps = settings?.workflowSteps ?? [];
+  const ready = isReadyForEmail(patient, workflowSteps);
+  const pending = pendingWorkflowSteps(patient, workflowSteps);
 
   async function saveInfo(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -72,7 +73,7 @@ export function PatientDetail({ user }: { user: User }) {
 
   async function saveWorkflow() {
     if (!patient || !workflowDraft) return;
-    await updateWorkflow(patient, workflowDraft, user.uid, customAssaysDraft);
+    await updateWorkflow(patient, workflowDraft, user.uid, customAssaysDraft, workflowSteps);
     setMessage("Workflow saved.");
   }
 
@@ -124,8 +125,8 @@ export function PatientDetail({ user }: { user: User }) {
           <p className="muted">Use coded identifiers only unless your Firebase project is authorized for PHI.</p>
         </div>
         <div className="detail-actions">
-          <StatusBadge status={ready ? "Ready to Send" : patient.overallStatus} />
-          <ProgressBar value={calculateProgress(patient.workflow)} />
+          <StatusBadge status={ready ? "Ready to Send" : patient.overallStatus === "Blocked" ? "Withdrawn/Dropout" : patient.overallStatus} />
+          <ProgressBar value={calculateProgress(patient, workflowSteps)} />
         </div>
       </section>
 
@@ -150,6 +151,7 @@ export function PatientDetail({ user }: { user: User }) {
           customAssays={customAssaysDraft}
           setCustomAssays={setCustomAssaysDraft}
           assignees={settings?.assignees ?? ["Magda", "Nisha"]}
+          workflowSteps={workflowSteps}
         />
       </section>
 
@@ -203,30 +205,49 @@ function WorkflowEditor({
   setWorkflow,
   customAssays,
   setCustomAssays,
-  assignees
+  assignees,
+  workflowSteps
 }: {
   workflow: PatientWorkflow;
   setWorkflow: (workflow: PatientWorkflow) => void;
   customAssays: CustomAssayWorkflow[];
   setCustomAssays: (assays: CustomAssayWorkflow[]) => void;
   assignees: string[];
+  workflowSteps: AppSettings["workflowSteps"];
 }) {
+  const customById = new Map(customAssays.map((assay) => [assay.id, assay]));
+
   return (
     <div className="workflow-grid">
-      <AssignedSection title="Phenotyping" item={workflow.phenotyping} dateKey="performedDate" dateLabel="Date assay performed" assignees={assignees} onChange={(item) => setWorkflow({ ...workflow, phenotyping: item })} />
-      <AssignedSection title="Request Cells" item={workflow.requestCells} dateKey="requestedDate" dateLabel="Date cells requested" assignees={assignees} onChange={(item) => setWorkflow({ ...workflow, requestCells: item })} />
-      <SimpleSection title="XCelligence" item={workflow.xCelligence} onChange={(item) => setWorkflow({ ...workflow, xCelligence: item })} />
-      <AssignedSection title="ELISA" item={workflow.elisa} assignees={assignees} onChange={(item) => setWorkflow({ ...workflow, elisa: item })} />
-      <AssignedSection title="Report" item={workflow.report} assignees={assignees} onChange={(item) => setWorkflow({ ...workflow, report: item })} />
-      {customAssays.map((assay, index) => (
-        <AssignedSection
-          key={assay.id}
-          title={assay.name}
-          item={assay}
-          assignees={assignees}
-          onChange={(item) => setCustomAssays(customAssays.map((candidate, candidateIndex) => candidateIndex === index ? item : candidate))}
-        />
-      ))}
+      {workflowSteps.map((step) => {
+        if (step.id === "phenotyping") {
+          return <AssignedSection key={step.id} title={step.name} item={workflow.phenotyping} dateKey="performedDate" dateLabel="Date assay performed" assignees={assignees} onChange={(item) => setWorkflow({ ...workflow, phenotyping: item })} />;
+        }
+        if (step.id === "requestCells") {
+          return <AssignedSection key={step.id} title={step.name} item={workflow.requestCells} dateKey="requestedDate" dateLabel="Date cells requested" assignees={assignees} onChange={(item) => setWorkflow({ ...workflow, requestCells: item })} />;
+        }
+        if (step.id === "xCelligence") {
+          return <SimpleSection key={step.id} title={step.name} item={workflow.xCelligence} onChange={(item) => setWorkflow({ ...workflow, xCelligence: item })} />;
+        }
+        if (step.id === "elisa") {
+          return <AssignedSection key={step.id} title={step.name} item={workflow.elisa} assignees={assignees} onChange={(item) => setWorkflow({ ...workflow, elisa: item })} />;
+        }
+        if (step.id === "report") {
+          return <AssignedSection key={step.id} title={step.name} item={workflow.report} assignees={assignees} onChange={(item) => setWorkflow({ ...workflow, report: item })} />;
+        }
+
+        const assay = customById.get(step.id);
+        if (!assay) return null;
+        return (
+          <AssignedSection
+            key={step.id}
+            title={step.name}
+            item={{ ...assay, name: step.name }}
+            assignees={assignees}
+            onChange={(item) => setCustomAssays(customAssays.map((candidate) => candidate.id === step.id ? item : candidate))}
+          />
+        );
+      })}
     </div>
   );
 }

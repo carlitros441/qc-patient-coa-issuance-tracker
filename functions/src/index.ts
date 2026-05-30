@@ -23,6 +23,38 @@ function encodeMessage({ to, subject, body, from }: { to: string[]; subject: str
   return Buffer.from(message).toString("base64url");
 }
 
+const defaultWorkflowSteps = [
+  { id: "phenotyping", name: "Phenotyping", type: "core" },
+  { id: "requestCells", name: "Request Cells", type: "core" },
+  { id: "xCelligence", name: "XCelligence", type: "core" },
+  { id: "elisa", name: "ELISA", type: "core" },
+  { id: "report", name: "Report", type: "core" }
+];
+
+function getConfiguredWorkflowSteps(settings: FirebaseFirestore.DocumentData | undefined) {
+  const workflowSteps = Array.isArray(settings?.workflowSteps) && settings?.workflowSteps.length > 0
+    ? settings.workflowSteps
+    : defaultWorkflowSteps;
+  const seen = new Set<string>();
+  return [
+    ...workflowSteps.filter((step: { id?: string; name?: string; type?: string }) => {
+      if (!step.id || !step.name || seen.has(step.id)) return false;
+      seen.add(step.id);
+      return true;
+    }),
+    ...defaultWorkflowSteps.filter((step) => !seen.has(step.id))
+  ];
+}
+
+function isWorkflowReady(patient: FirebaseFirestore.DocumentData, settings: FirebaseFirestore.DocumentData | undefined) {
+  const workflow = patient.workflow;
+  const customAssays = Array.isArray(patient.customAssays) ? patient.customAssays : [];
+  return getConfiguredWorkflowSteps(settings).every((step: { id: string; type: string }) => {
+    if (step.type === "core") return workflow?.[step.id]?.status === "Completed";
+    return customAssays.find((assay: { id?: string }) => assay.id === step.id)?.status === "Completed";
+  }) && patient.emailNotification?.sent === false;
+}
+
 export const sendCoaEmailNotification = onCall(
   { region: "us-central1", secrets: [clientId, clientSecret, refreshToken, sender] },
   async (request) => {
@@ -44,13 +76,8 @@ export const sendCoaEmailNotification = onCall(
     if (!patientSnap.exists) throw new HttpsError("not-found", "Patient record not found.");
 
     const patient = patientSnap.data()!;
-    const workflow = patient.workflow;
-    const ready = workflow?.phenotyping?.status === "Completed"
-      && workflow?.requestCells?.status === "Completed"
-      && workflow?.xCelligence?.status === "Completed"
-      && workflow?.elisa?.status === "Completed"
-      && workflow?.report?.status === "Completed"
-      && patient.emailNotification?.sent === false;
+    const settingsSnap = await admin.firestore().doc("settings/global").get();
+    const ready = isWorkflowReady(patient, settingsSnap.data());
 
     if (!ready) throw new HttpsError("failed-precondition", "Workflow is not ready for email notification.");
 

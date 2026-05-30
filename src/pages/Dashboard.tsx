@@ -7,7 +7,7 @@ import { DEFAULT_SETTINGS, OVERALL_STATUSES } from "../constants";
 import { subscribePatients } from "../services/patientService";
 import { subscribeSettings } from "../services/settingsService";
 import type { AppSettings, Patient } from "../types";
-import { calculateProgress, getGatingAssay, isReadyForEmail } from "../utils/workflow";
+import { calculateProgress, getGatingStep, isReadyForEmail } from "../utils/workflow";
 
 export function Dashboard() {
   const [patients, setPatients] = useState<Patient[]>([]);
@@ -30,33 +30,36 @@ export function Dashboard() {
       ...(patient.customAssays ?? []).map((item) => item.assignedTo)
     ];
     return (project === "All" || patient.project === project)
-      && (status === "All" || patient.overallStatus === status)
+      && (status === "All" || patient.overallStatus === status || (status === "Withdrawn/Dropout" && patient.overallStatus === "Blocked"))
       && (assignee === "All" || assignments.includes(assignee))
-      && (!readyOnly || isReadyForEmail(patient))
+      && (!readyOnly || isReadyForEmail(patient, settings.workflowSteps))
       && patient.patientId.toLowerCase().includes(search.toLowerCase());
-  }), [patients, project, status, assignee, readyOnly, search]);
+  }), [patients, project, status, assignee, readyOnly, search, settings.workflowSteps]);
 
   const totals = {
     total: patients.length,
     coExist: patients.filter((patient) => patient.project === "Co-Exist").length,
     care: patients.filter((patient) => patient.project === "CARE").length,
-    ready: patients.filter(isReadyForEmail).length,
+    ready: patients.filter((patient) => isReadyForEmail(patient, settings.workflowSteps)).length,
     issued: patients.filter((patient) => patient.overallStatus === "CoA Issued").length,
-    blocked: patients.filter((patient) => patient.overallStatus === "Blocked").length
+    withdrawn: patients.filter((patient) => patient.overallStatus === "Withdrawn/Dropout" || patient.overallStatus === "Blocked").length
   };
 
   return (
     <main className="page stack">
-      <section className="summary-grid">
-        <Summary label="Total patients" value={totals.total} />
-        <Summary label="Co-Exist patients" value={totals.coExist} />
-        <Summary label="CARE patients" value={totals.care} />
-        <Summary label="Ready for Email" value={totals.ready} />
-        <Summary label="CoA Issued" value={totals.issued} />
-        <Summary label="Blocked" value={totals.blocked} />
-      </section>
+      <details className="summary-dropdown">
+        <summary>Dashboard summary</summary>
+        <section className="summary-grid">
+          <Summary label="Total patients" value={totals.total} />
+          <Summary label="Co-Exist patients" value={totals.coExist} />
+          <Summary label="CARE patients" value={totals.care} />
+          <Summary label="Ready for Email" value={totals.ready} />
+          <Summary label="CoA Issued" value={totals.issued} />
+          <Summary label="Withdrawn/Dropout" value={totals.withdrawn} />
+        </section>
+      </details>
 
-      <section className="panel filters">
+      <section className="panel filters compact-filters">
         <select value={project} onChange={(event) => setProject(event.target.value)}>
           <option>All</option>
           {settings.projects.map((item) => <option key={item}>{item}</option>)}
@@ -74,7 +77,7 @@ export function Dashboard() {
       </section>
 
       <section className="patient-grid">
-        {filtered.map((patient) => <PatientCard key={patient.id} patient={patient} />)}
+        {filtered.map((patient) => <PatientCard key={patient.id} patient={patient} settings={settings} />)}
         {filtered.length === 0 && <div className="empty">No patient records match the current filters.</div>}
       </section>
     </main>
@@ -85,8 +88,8 @@ function Summary({ label, value }: { label: string; value: number }) {
   return <div className="summary-card"><span>{label}</span><strong>{value}</strong></div>;
 }
 
-function PatientCard({ patient }: { patient: Patient }) {
-  const progress = calculateProgress(patient.workflow);
+function PatientCard({ patient, settings }: { patient: Patient; settings: AppSettings }) {
+  const progress = calculateProgress(patient, settings.workflowSteps);
   return (
     <Link to={`/patients/${patient.id}`} className="patient-card">
       <div className="card-top">
@@ -94,10 +97,10 @@ function PatientCard({ patient }: { patient: Patient }) {
           <h2>{patient.patientId}</h2>
           <p>{patient.project}</p>
         </div>
-        <StatusBadge status={isReadyForEmail(patient) ? "Ready to Send" : patient.overallStatus} />
+        <StatusBadge status={isReadyForEmail(patient, settings.workflowSteps) ? "Ready to Send" : patient.overallStatus === "Blocked" ? "Withdrawn/Dropout" : patient.overallStatus} />
       </div>
       <ProgressBar value={progress} />
-      <p className="gating-line">Gating assay: <strong>{getGatingAssay(patient)}</strong></p>
+      <p className="gating-line">Gating Step: <strong>{getGatingStep(patient, settings.workflowSteps)}</strong></p>
       <div className="meta-line">
         <span>Email: {patient.emailNotification.status}</span>
         <span>{patient.updatedAt?.toDate().toLocaleDateString() ?? "New"}</span>

@@ -76,7 +76,6 @@ function Shell({ user }: AuthContextValue) {
       <div className="content">
         <header className="topbar">
           <div>
-            <p className="eyebrow">Pastel QC workspace</p>
             <h1>Patient CoA Issuance</h1>
           </div>
           <div className="user-chip">{user.email}</div>

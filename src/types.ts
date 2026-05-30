@@ -3,7 +3,7 @@ import type { Timestamp } from "firebase/firestore";
 export type Project = "Co-Exist" | "CARE" | string;
 export type Assignee = "Magda" | "Nisha" | string;
 export type WorkflowStatus = "Not Started" | "In Process" | "Completed";
-export type OverallStatus = "Not Started" | "In Process" | "Ready for CoA" | "CoA Issued" | "Blocked";
+export type OverallStatus = "Not Started" | "In Process" | "Ready for CoA" | "CoA Issued" | "Withdrawn/Dropout" | "Blocked";
 export type EmailStatus = "Not Ready" | "Ready to Send" | "Sent" | "Failed";
 export type UserRole = "Admin" | "QC User" | "Viewer";
 
@@ -42,6 +42,14 @@ export interface CustomAssayWorkflow {
   notes: string;
 }
 
+export type CoreWorkflowStepId = keyof PatientWorkflow;
+
+export interface WorkflowStepTemplate {
+  id: string;
+  name: string;
+  type: "core" | "custom";
+}
+
 export interface EmailNotification {
   sent: boolean;
   status: EmailStatus;
@@ -72,6 +80,7 @@ export interface AppSettings {
   projects: string[];
   assignees: string[];
   assayTemplates: string[];
+  workflowSteps: WorkflowStepTemplate[];
   emailTemplate: string;
   userRoles?: Record<string, UserRole>;
 }

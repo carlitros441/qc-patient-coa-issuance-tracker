@@ -1,8 +1,16 @@
-import type { AppSettings, PatientWorkflow, WorkflowStatus } from "./types";
+import type { AppSettings, PatientWorkflow, WorkflowStatus, WorkflowStepTemplate } from "./types";
 
 export const WORKFLOW_STATUSES: WorkflowStatus[] = ["Not Started", "In Process", "Completed"];
 
-export const OVERALL_STATUSES = ["Not Started", "In Process", "Ready for CoA", "CoA Issued", "Blocked"] as const;
+export const OVERALL_STATUSES = ["Not Started", "In Process", "Ready for CoA", "CoA Issued", "Withdrawn/Dropout"] as const;
+
+export const DEFAULT_WORKFLOW_STEPS: WorkflowStepTemplate[] = [
+  { id: "phenotyping", name: "Phenotyping", type: "core" },
+  { id: "requestCells", name: "Request Cells", type: "core" },
+  { id: "xCelligence", name: "XCelligence", type: "core" },
+  { id: "elisa", name: "ELISA", type: "core" },
+  { id: "report", name: "Report", type: "core" }
+];
 
 export const EMAIL_TEMPLATE = `Hello,
 
@@ -25,6 +33,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   projects: ["Co-Exist", "CARE"],
   assignees: ["Magda", "Nisha"],
   assayTemplates: [],
+  workflowSteps: DEFAULT_WORKFLOW_STEPS,
   emailTemplate: EMAIL_TEMPLATE,
   userRoles: {}
 };

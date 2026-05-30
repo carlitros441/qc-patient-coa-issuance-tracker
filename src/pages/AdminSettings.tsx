@@ -1,16 +1,17 @@
 import type { User } from "firebase/auth";
-import { Plus, Save, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, Plus, Save, Trash2 } from "lucide-react";
 import { FormEvent, useEffect, useState } from "react";
 import { DEFAULT_SETTINGS } from "../constants";
 import { saveSettings, subscribeSettings } from "../services/settingsService";
-import type { AppSettings } from "../types";
+import type { AppSettings, WorkflowStepTemplate } from "../types";
+import { assayIdFromName, buildWorkflowSteps } from "../utils/workflow";
 
 export function AdminSettings({ user }: { user: User }) {
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [message, setMessage] = useState("");
   const [newProject, setNewProject] = useState("");
   const [newAssignee, setNewAssignee] = useState("");
-  const [newAssay, setNewAssay] = useState("");
+  const [newWorkflowStep, setNewWorkflowStep] = useState("");
 
   useEffect(() => subscribeSettings(setSettings), []);
 
@@ -68,17 +69,19 @@ export function AdminSettings({ user }: { user: User }) {
             />
           </label>
           <label>
-            Additional workflow assays
-            <EditableList
-              values={settings.assayTemplates ?? []}
-              newValue={newAssay}
-              newPlaceholder="Add assay after Report"
-              onNewValue={setNewAssay}
-              onChange={(assayTemplates) => setSettings({ ...settings, assayTemplates })}
+            Workflow assays and steps
+            <WorkflowStepList
+              steps={settings.workflowSteps}
+              newValue={newWorkflowStep}
+              onNewValue={setNewWorkflowStep}
+              onChange={(workflowSteps) => setSettings({ ...settings, workflowSteps, assayTemplates: workflowSteps.filter((step) => step.type === "custom").map((step) => step.name) })}
               onAdd={() => {
-                if (!newAssay.trim()) return;
-                setSettings({ ...settings, assayTemplates: uniqueList([...(settings.assayTemplates ?? []), newAssay]) });
-                setNewAssay("");
+                const name = newWorkflowStep.trim();
+                if (!name) return;
+                const customStep = { id: assayIdFromName(name), name, type: "custom" as const };
+                const workflowSteps = buildWorkflowSteps([...settings.workflowSteps, customStep]);
+                setSettings({ ...settings, workflowSteps, assayTemplates: workflowSteps.filter((step) => step.type === "custom").map((step) => step.name) });
+                setNewWorkflowStep("");
               }}
             />
           </label>
@@ -104,6 +107,63 @@ export function AdminSettings({ user }: { user: User }) {
       </section>
     </main>
   );
+}
+
+function WorkflowStepList({
+  steps,
+  newValue,
+  onNewValue,
+  onChange,
+  onAdd
+}: {
+  steps: WorkflowStepTemplate[];
+  newValue: string;
+  onNewValue: (value: string) => void;
+  onChange: (steps: WorkflowStepTemplate[]) => void;
+  onAdd: () => void;
+}) {
+  function update(nextSteps: WorkflowStepTemplate[]) {
+    onChange(buildWorkflowSteps(nextSteps));
+  }
+
+  return (
+    <div className="workflow-step-list">
+      {steps.map((step, index) => (
+        <div className="workflow-step-row" key={step.id}>
+          <span className="step-order">{index + 1}</span>
+          <input
+            value={step.name}
+            onChange={(event) => update(steps.map((candidate) => candidate.id === step.id ? { ...candidate, name: event.target.value } : candidate))}
+          />
+          <span className="step-kind">{step.type === "core" ? "Required" : "Custom"}</span>
+          <button className="icon-button" type="button" aria-label={`Move ${step.name} up`} disabled={index === 0} onClick={() => update(moveItem(steps, index, index - 1))}>
+            <ArrowUp size={16} />
+          </button>
+          <button className="icon-button" type="button" aria-label={`Move ${step.name} down`} disabled={index === steps.length - 1} onClick={() => update(moveItem(steps, index, index + 1))}>
+            <ArrowDown size={16} />
+          </button>
+          <button className="icon-button" type="button" aria-label={`Remove ${step.name}`} disabled={step.type === "core"} onClick={() => update(steps.filter((candidate) => candidate.id !== step.id))}>
+            <Trash2 size={16} />
+          </button>
+        </div>
+      ))}
+      <div className="workflow-step-row add-step-row">
+        <span className="step-order">+</span>
+        <input value={newValue} placeholder="Add workflow assay or step" onChange={(event) => onNewValue(event.target.value)} />
+        <span className="step-kind">Custom</span>
+        <button className="icon-button" type="button" aria-label="Add workflow step" onClick={onAdd}>
+          <Plus size={16} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function moveItem<T>(items: T[], from: number, to: number) {
+  const next = [...items];
+  const [item] = next.splice(from, 1);
+  next.splice(to, 0, item);
+  return next;
 }
 
 function uniqueList(values: string[]) {
