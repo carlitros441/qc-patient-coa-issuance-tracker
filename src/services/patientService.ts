@@ -13,7 +13,7 @@ import {
 } from "firebase/firestore";
 import { db } from "../firebase";
 import { defaultWorkflow } from "../constants";
-import type { AuditLog, CustomAssayWorkflow, OverallStatus, Patient, PatientWorkflow, Project, WorkflowStepTemplate } from "../types";
+import type { AdditionalAssay, AuditLog, CustomAssayWorkflow, OverallStatus, Patient, PatientWorkflow, Project, WorkflowStepTemplate } from "../types";
 import { buildEmailSubject, deriveOverallStatus, isReadyForEmail } from "../utils/workflow";
 
 const patientsCollection = collection(db, "patients");
@@ -128,6 +128,15 @@ export async function manuallyConfirmEmailSent(
     updatedBy: input.userId
   });
   await logAudit(patient.id, "Manually confirmed email notification sent", "emailNotification", patient.emailNotification, { status: "Sent", sent: true }, input.userId);
+}
+
+export async function updateAdditionalAssays(patient: Patient, additionalAssays: AdditionalAssay[], userId: string) {
+  await updateDoc(doc(db, "patients", patient.id), {
+    additionalAssays,
+    updatedAt: serverTimestamp(),
+    updatedBy: userId
+  });
+  await logAudit(patient.id, "Updated additional assays", "additionalAssays", patient.additionalAssays ?? [], additionalAssays, userId);
 }
 
 export async function logAudit(

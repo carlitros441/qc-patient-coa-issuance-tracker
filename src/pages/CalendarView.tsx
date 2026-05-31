@@ -32,6 +32,7 @@ export function CalendarView() {
 
   const workflowSteps = useMemo(() => buildWorkflowSteps(settings.workflowSteps, settings.assayTemplates), [settings]);
   const events = useMemo(() => patients.flatMap((patient) => getPatientEvents(patient, workflowSteps)), [patients, workflowSteps]);
+  const assayOptions = useMemo(() => Array.from(new Set([...workflowSteps.map((step) => step.name), ...events.map((event) => event.assay)])).sort(), [events, workflowSteps]);
   const filteredEvents = useMemo(() => {
     return events.filter((event) =>
       (patientFilter === "All" || event.patientDocId === patientFilter)
@@ -57,7 +58,7 @@ export function CalendarView() {
         </select>
         <select value={assayFilter} onChange={(event) => setAssayFilter(event.target.value)}>
           <option>All</option>
-          {workflowSteps.map((step) => <option key={step.id}>{step.name}</option>)}
+          {assayOptions.map((assay) => <option key={assay}>{assay}</option>)}
         </select>
         <select value={analystFilter} onChange={(event) => setAnalystFilter(event.target.value)}>
           <option>All</option>
@@ -82,7 +83,7 @@ export function CalendarView() {
 
 function getPatientEvents(patient: Patient, workflowSteps: WorkflowStepTemplate[]): CalendarEvent[] {
   const customById = new Map((patient.customAssays ?? []).map((assay) => [assay.id, assay]));
-  return workflowSteps.flatMap((step) => {
+  const workflowEvents = workflowSteps.flatMap((step) => {
     const item = getWorkflowItem(patient.workflow, customById, step);
     const date = getScheduleDate(item);
     if (!item || !date) return [];
@@ -96,6 +97,19 @@ function getPatientEvents(patient: Patient, workflowSteps: WorkflowStepTemplate[
       status: item.status
     }];
   });
+  const additionalEvents = (patient.additionalAssays ?? []).flatMap((assay) => {
+    if (!assay.scheduledDate) return [];
+    return [{
+      id: `${patient.id}-additional-${assay.id}`,
+      date: assay.scheduledDate,
+      patientId: patient.patientId,
+      patientDocId: patient.id,
+      assay: assay.name,
+      analyst: assay.assignedTo,
+      status: assay.status
+    }];
+  });
+  return [...workflowEvents, ...additionalEvents];
 }
 
 function getWorkflowItem(workflow: PatientWorkflow, customById: Map<string, CustomAssayWorkflow>, step: WorkflowStepTemplate) {

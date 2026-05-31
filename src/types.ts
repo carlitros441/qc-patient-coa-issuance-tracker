@@ -41,6 +41,15 @@ export interface CustomAssayWorkflow {
   notes: string;
 }
 
+export interface AdditionalAssay {
+  id: string;
+  name: string;
+  status: WorkflowStatus;
+  assignedTo: Assignee;
+  scheduledDate: string | null;
+  notes: string;
+}
+
 export type CoreWorkflowStepId = keyof PatientWorkflow;
 
 export interface WorkflowStepTemplate {
@@ -71,6 +80,7 @@ export interface Patient {
   updatedBy: string;
   workflow: PatientWorkflow;
   customAssays?: CustomAssayWorkflow[];
+  additionalAssays?: AdditionalAssay[];
   emailNotification: EmailNotification;
 }
 

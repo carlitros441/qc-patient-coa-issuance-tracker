@@ -219,6 +219,17 @@ textarea { resize: vertical; }
 .span-2 { grid-column: span 2; }
 .workflow-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; margin-top: 16px; }
 .workflow-card { padding: 16px; display: grid; gap: 12px; background: #fffefd; }
+.workflow-card-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.add-assay-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  margin-top: 16px;
+}
 .ready-note { color: #27617b; font-weight: 900; }
 .audit-list { display: grid; gap: 10px; margin-top: 12px; }
 .audit-item { display: grid; grid-template-columns: 1fr 1fr auto; gap: 10px; align-items: center; padding: 12px; border: 1px solid var(--line); border-radius: 16px; background: #fff; }
@@ -403,6 +414,7 @@ textarea { resize: vertical; }
   .span-2 { grid-column: auto; }
   .sidebar nav { grid-template-columns: 1fr; }
   .audit-item, .preview-list { grid-template-columns: 1fr; }
+  .add-assay-row { grid-template-columns: 1fr; }
   .calendar-toolbar, .calendar-list-item { grid-template-columns: 1fr; }
   .calendar-month { grid-template-columns: 1fr; }
   .calendar-weekday { display: none; }

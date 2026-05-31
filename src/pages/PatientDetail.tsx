@@ -1,5 +1,5 @@
 import type { User } from "firebase/auth";
-import { Mail, Save } from "lucide-react";
+import { Mail, Plus, Save, Trash2 } from "lucide-react";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import { AssigneeBadge, StatusBadge } from "../components/Badges";
@@ -7,10 +7,10 @@ import { Modal } from "../components/Modal";
 import { ProgressBar } from "../components/ProgressBar";
 import { WORKFLOW_STATUSES } from "../constants";
 import { sendEmailNotification } from "../services/emailService";
-import { manuallyConfirmEmailSent, subscribeAuditLogs, subscribePatient, updatePatientInfo, updateWorkflow } from "../services/patientService";
+import { manuallyConfirmEmailSent, subscribeAuditLogs, subscribePatient, updateAdditionalAssays, updatePatientInfo, updateWorkflow } from "../services/patientService";
 import { subscribeSettings } from "../services/settingsService";
-import type { AppSettings, AssignedWorkflowItem, AuditLog, CustomAssayWorkflow, Patient, PatientWorkflow, PhenotypingWorkflow, RequestCellsWorkflow, WorkflowStatus } from "../types";
-import { buildEmailBody, buildEmailSubject, calculateProgress, isReadyForEmail, mergeCustomAssays, pendingWorkflowSteps, workflowLabels } from "../utils/workflow";
+import type { AdditionalAssay, AppSettings, AssignedWorkflowItem, AuditLog, CustomAssayWorkflow, Patient, PatientWorkflow, PhenotypingWorkflow, RequestCellsWorkflow, WorkflowStatus } from "../types";
+import { assayIdFromName, buildEmailBody, buildEmailSubject, calculateProgress, isReadyForEmail, mergeCustomAssays, pendingWorkflowSteps, workflowLabels } from "../utils/workflow";
 
 export function PatientDetail({ user }: { user: User }) {
   const { id } = useParams();
@@ -19,6 +19,8 @@ export function PatientDetail({ user }: { user: User }) {
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [workflowDraft, setWorkflowDraft] = useState<PatientWorkflow | null>(null);
   const [customAssaysDraft, setCustomAssaysDraft] = useState<CustomAssayWorkflow[]>([]);
+  const [additionalAssaysDraft, setAdditionalAssaysDraft] = useState<AdditionalAssay[]>([]);
+  const [newAdditionalAssayName, setNewAdditionalAssayName] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -36,6 +38,7 @@ export function PatientDetail({ user }: { user: User }) {
             scheduledDate: nextPatient.workflow.xCelligence.scheduledDate ?? null
           }
         });
+        setAdditionalAssaysDraft(nextPatient.additionalAssays ?? []);
       }
     });
     const unsubAudit = subscribeAuditLogs(id, setAuditLogs);
@@ -86,6 +89,30 @@ export function PatientDetail({ user }: { user: User }) {
     if (!patient || !workflowDraft) return;
     await updateWorkflow(patient, workflowDraft, user.uid, customAssaysDraft, workflowSteps);
     setMessage("Workflow saved.");
+  }
+
+  async function saveAdditionalAssays() {
+    if (!patient) return;
+    await updateAdditionalAssays(patient, additionalAssaysDraft, user.uid);
+    setMessage("Additional assays saved.");
+  }
+
+  function addAdditionalAssay() {
+    const name = newAdditionalAssayName.trim();
+    if (!name) return;
+    const id = `${assayIdFromName(name)}-${Date.now()}`;
+    setAdditionalAssaysDraft([
+      ...additionalAssaysDraft,
+      {
+        id,
+        name,
+        status: "Not Started",
+        assignedTo: settings?.assignees?.[0] ?? "Magda",
+        scheduledDate: null,
+        notes: ""
+      }
+    ]);
+    setNewAdditionalAssayName("");
   }
 
   async function confirmSendEmail() {
@@ -194,6 +221,36 @@ export function PatientDetail({ user }: { user: User }) {
         {error && <p className="error">{error}</p>}
       </section>
 
+      <section className="panel additional-assays-panel">
+        <div className="section-heading">
+          <div>
+            <h3>Additional Assays</h3>
+            <p className="muted">Patient-specific assays here do not affect workflow gating or progress.</p>
+          </div>
+          <button className="primary" type="button" onClick={saveAdditionalAssays}><Save size={18} />Save additional assays</button>
+        </div>
+        <div className="add-assay-row">
+          <input value={newAdditionalAssayName} placeholder="Add patient-specific assay" onChange={(event) => setNewAdditionalAssayName(event.target.value)} />
+          <button className="ghost" type="button" onClick={addAdditionalAssay}><Plus size={18} />Add assay</button>
+        </div>
+        {additionalAssaysDraft.length > 0 ? (
+          <div className="workflow-grid">
+            {additionalAssaysDraft.map((assay) => (
+              <AssignedSection
+                key={assay.id}
+                title={assay.name}
+                item={assay}
+                assignees={settings?.assignees ?? ["Magda", "Nisha"]}
+                onChange={(item) => setAdditionalAssaysDraft(additionalAssaysDraft.map((candidate) => candidate.id === assay.id ? item : candidate))}
+                onRemove={() => setAdditionalAssaysDraft(additionalAssaysDraft.filter((candidate) => candidate.id !== assay.id))}
+              />
+            ))}
+          </div>
+        ) : (
+          <p className="empty">No patient-specific additional assays have been added.</p>
+        )}
+      </section>
+
       <section className="panel audit-panel">
         <h3>Audit / History Log</h3>
         <div className="audit-list">
@@ -280,13 +337,14 @@ function WorkflowEditor({
   );
 }
 
-type DatedAssignedWorkflowItem = AssignedWorkflowItem | PhenotypingWorkflow | RequestCellsWorkflow | CustomAssayWorkflow;
+type DatedAssignedWorkflowItem = AssignedWorkflowItem | PhenotypingWorkflow | RequestCellsWorkflow | CustomAssayWorkflow | AdditionalAssay;
 
 interface AssignedSectionProps<T extends DatedAssignedWorkflowItem> {
   title: string;
   item: T;
   onChange: (item: T) => void;
   assignees: string[];
+  onRemove?: () => void;
 }
 
 function getScheduleDate(item: DatedAssignedWorkflowItem) {
@@ -294,10 +352,16 @@ function getScheduleDate(item: DatedAssignedWorkflowItem) {
   return item.scheduledDate ?? legacyDates.performedDate ?? legacyDates.requestedDate ?? "";
 }
 
-function AssignedSection<T extends DatedAssignedWorkflowItem>({ title, item, onChange, assignees }: AssignedSectionProps<T>) {
+function AssignedSection<T extends DatedAssignedWorkflowItem>({ title, item, onChange, assignees, onRemove }: AssignedSectionProps<T>) {
   return (
     <section className="workflow-card">
-      <header><h4>{title}</h4><AssigneeBadge assignee={item.assignedTo} /></header>
+      <header>
+        <h4>{title}</h4>
+        <div className="workflow-card-actions">
+          <AssigneeBadge assignee={item.assignedTo} />
+          {onRemove && <button className="icon-button" type="button" aria-label={`Remove ${title}`} onClick={onRemove}><Trash2 size={16} /></button>}
+        </div>
+      </header>
       <label>Status<select value={item.status} onChange={(event) => onChange({ ...item, status: event.target.value as WorkflowStatus })}>{WORKFLOW_STATUSES.map((status) => <option key={status}>{status}</option>)}</select></label>
       <label>Schedule Date<input type="date" value={getScheduleDate(item)} onChange={(event) => onChange({ ...item, scheduledDate: event.target.value || null })} /></label>
       <label>Analyst<select value={item.assignedTo} onChange={(event) => onChange({ ...item, assignedTo: event.target.value })}>{assignees.map((name: string) => <option key={name}>{name}</option>)}</select></label>
