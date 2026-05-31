@@ -4,7 +4,7 @@ import type { Assignee, CustomAssayWorkflow, Patient, PatientWorkflow, WorkflowS
 export const workflowLabels: Record<keyof PatientWorkflow, string> = {
   phenotyping: "Phenotyping",
   requestCells: "Request Cells",
-  xCelligence: "XCelligence",
+  xCelligence: "xCELLIGENCE",
   elisa: "ELISA",
   report: "Report"
 };
@@ -48,6 +48,13 @@ export function completedWorkflowCount(patient: Pick<Patient, "workflow" | "cust
   return buildWorkflowSteps(workflowSteps).filter((step) => getStepStatus(patient, step) === "Completed").length;
 }
 
+export function initiatedWorkflowCount(patient: Pick<Patient, "workflow" | "customAssays">, workflowSteps = DEFAULT_WORKFLOW_STEPS) {
+  return buildWorkflowSteps(workflowSteps).filter((step) => {
+    const status = getStepStatus(patient, step);
+    return status === "In Process" || status === "Completed";
+  }).length;
+}
+
 export function calculateProgress(patient: Pick<Patient, "workflow" | "customAssays">, workflowSteps = DEFAULT_WORKFLOW_STEPS) {
   const steps = buildWorkflowSteps(workflowSteps);
   if (steps.length === 0) return 0;
@@ -79,12 +86,13 @@ export function buildEmailBody(patient: Pick<Patient, "patientId" | "project">, 
 }
 
 export function deriveOverallStatus(patient: Pick<Patient, "workflow" | "customAssays" | "emailNotification" | "overallStatus">, workflowSteps = DEFAULT_WORKFLOW_STEPS) {
-  if (patient.overallStatus === "Withdrawn/Dropout" || patient.overallStatus === "Blocked" || patient.overallStatus === "CoA Issued") {
-    return patient.overallStatus === "Blocked" ? "Withdrawn/Dropout" : patient.overallStatus;
+  if (patient.emailNotification.sent) return "CoA Issued";
+  if (patient.overallStatus === "Withdrawn/Dropout" || patient.overallStatus === "Blocked") {
+    if (patient.overallStatus === "Blocked") return "Withdrawn/Dropout";
+    return patient.overallStatus;
   }
-  if (patient.emailNotification.sent) return "Ready for CoA";
-  if (isReadyForEmail(patient, workflowSteps)) return "Ready for CoA";
-  return completedWorkflowCount(patient, workflowSteps) === 0 ? "Not Started" : "In Process";
+  if (pendingWorkflowSteps(patient, workflowSteps).length === 0) return "Ready for Email";
+  return initiatedWorkflowCount(patient, workflowSteps) === 0 ? "Not Started" : "In Process";
 }
 
 export function assayIdFromName(name: string) {

@@ -5,11 +5,11 @@ import { useParams } from "react-router-dom";
 import { AssigneeBadge, StatusBadge } from "../components/Badges";
 import { Modal } from "../components/Modal";
 import { ProgressBar } from "../components/ProgressBar";
-import { WORKFLOW_STATUSES, OVERALL_STATUSES } from "../constants";
+import { WORKFLOW_STATUSES } from "../constants";
 import { sendEmailNotification } from "../services/emailService";
-import { subscribeAuditLogs, subscribePatient, updatePatientInfo, updateWorkflow } from "../services/patientService";
+import { manuallyConfirmEmailSent, subscribeAuditLogs, subscribePatient, updatePatientInfo, updateWorkflow } from "../services/patientService";
 import { subscribeSettings } from "../services/settingsService";
-import type { AppSettings, AssignedWorkflowItem, AuditLog, CustomAssayWorkflow, Patient, PatientWorkflow, PhenotypingWorkflow, RequestCellsWorkflow, WorkflowStatus, XCelligenceWorkflow } from "../types";
+import type { AppSettings, AssignedWorkflowItem, AuditLog, CustomAssayWorkflow, Patient, PatientWorkflow, PhenotypingWorkflow, RequestCellsWorkflow, WorkflowStatus } from "../types";
 import { buildEmailBody, buildEmailSubject, calculateProgress, isReadyForEmail, mergeCustomAssays, pendingWorkflowSteps, workflowLabels } from "../utils/workflow";
 
 export function PatientDetail({ user }: { user: User }) {
@@ -27,7 +27,15 @@ export function PatientDetail({ user }: { user: User }) {
     if (!id) return;
     const unsubPatient = subscribePatient(id, (nextPatient) => {
       setPatient(nextPatient);
-      if (nextPatient) setWorkflowDraft(nextPatient.workflow);
+      if (nextPatient) {
+        setWorkflowDraft({
+          ...nextPatient.workflow,
+          xCelligence: {
+            ...nextPatient.workflow.xCelligence,
+            assignedTo: nextPatient.workflow.xCelligence.assignedTo ?? "Magda"
+          }
+        });
+      }
     });
     const unsubAudit = subscribeAuditLogs(id, setAuditLogs);
     const unsubSettings = subscribeSettings(setSettings);
@@ -62,11 +70,13 @@ export function PatientDetail({ user }: { user: User }) {
     event.preventDefault();
     if (!patient) return;
     const form = new FormData(event.currentTarget);
+    const statusValue = String(form.get("overallStatus"));
     await updatePatientInfo(patient, {
       project: String(form.get("project")),
-      overallStatus: String(form.get("overallStatus")) as Patient["overallStatus"],
+      overallStatus: (statusValue === "Auto" ? "Not Started" : statusValue) as Patient["overallStatus"],
       notes: String(form.get("notes") ?? ""),
-      userId: user.uid
+      userId: user.uid,
+      workflowSteps
     });
     setMessage("Patient information saved.");
   }
@@ -91,6 +101,22 @@ export function PatientDetail({ user }: { user: User }) {
       setModalOpen(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Email send failed.");
+    }
+  }
+
+  async function confirmManualEmailSent() {
+    if (!patient || !emailPreview) return;
+    setError("");
+    try {
+      await manuallyConfirmEmailSent(patient, {
+        userId: user.uid,
+        recipients: emailPreview.recipients,
+        subject: emailPreview.subject,
+        workflowSteps
+      });
+      setMessage("Email notification manually confirmed as sent.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to confirm email sent.");
     }
   }
 
@@ -125,7 +151,7 @@ export function PatientDetail({ user }: { user: User }) {
           <p className="muted">Use coded identifiers only unless your Firebase project is authorized for PHI.</p>
         </div>
         <div className="detail-actions">
-          <StatusBadge status={ready ? "Ready to Send" : patient.overallStatus === "Blocked" ? "Withdrawn/Dropout" : patient.overallStatus} />
+          <StatusBadge status={ready ? "Ready to Send" : patient.overallStatus === "Blocked" ? "Withdrawn/Dropout" : patient.overallStatus === "Ready for CoA" ? "Ready for Email" : patient.overallStatus} />
           <ProgressBar value={calculateProgress(patient, workflowSteps)} />
         </div>
       </section>
@@ -134,7 +160,7 @@ export function PatientDetail({ user }: { user: User }) {
         <h3>Patient Information</h3>
         <form className="two-column-form" onSubmit={saveInfo}>
           <label>Project<select name="project" defaultValue={patient.project}>{(settings?.projects ?? ["Co-Exist", "CARE"]).map((item) => <option key={item}>{item}</option>)}</select></label>
-          <label>Overall status<select name="overallStatus" defaultValue={patient.overallStatus}>{OVERALL_STATUSES.map((item) => <option key={item}>{item}</option>)}</select></label>
+          <label>Overall status<select name="overallStatus" defaultValue={patient.overallStatus === "Withdrawn/Dropout" || patient.overallStatus === "Blocked" ? "Withdrawn/Dropout" : "Auto"}><option value="Auto">Automatic: {patient.overallStatus === "Ready for CoA" ? "Ready for Email" : patient.overallStatus}</option><option>Withdrawn/Dropout</option></select></label>
           <label className="span-2">Notes<textarea name="notes" defaultValue={patient.notes} rows={3} /></label>
           <button className="primary" type="submit"><Save size={18} />Save info</button>
         </form>
@@ -162,6 +188,7 @@ export function PatientDetail({ user }: { user: User }) {
         </div>
         {ready ? <p className="ready-note">Ready for Email Notification</p> : <p className="muted">Pending: {pending.join(", ") || "None"}</p>}
         <button className="primary" disabled={!ready} onClick={() => setModalOpen(true)}><Mail size={18} />Send Email Notification</button>
+        <button className="ghost" disabled={!ready} onClick={confirmManualEmailSent}>Confirm Email Sent Manually</button>
         {message && <p className="success">{message}</p>}
         {error && <p className="error">{error}</p>}
       </section>
@@ -227,7 +254,7 @@ function WorkflowEditor({
           return <AssignedSection key={step.id} title={step.name} item={workflow.requestCells} dateKey="requestedDate" dateLabel="Date cells requested" assignees={assignees} onChange={(item) => setWorkflow({ ...workflow, requestCells: item })} />;
         }
         if (step.id === "xCelligence") {
-          return <SimpleSection key={step.id} title={step.name} item={workflow.xCelligence} onChange={(item) => setWorkflow({ ...workflow, xCelligence: item })} />;
+          return <AssignedSection key={step.id} title={step.name} item={workflow.xCelligence} assignees={assignees} onChange={(item) => setWorkflow({ ...workflow, xCelligence: item })} />;
         }
         if (step.id === "elisa") {
           return <AssignedSection key={step.id} title={step.name} item={workflow.elisa} assignees={assignees} onChange={(item) => setWorkflow({ ...workflow, elisa: item })} />;
@@ -270,16 +297,6 @@ function AssignedSection<T extends DatedAssignedWorkflowItem>({ title, item, onC
       <label>Status<select value={item.status} onChange={(event) => onChange({ ...item, status: event.target.value as WorkflowStatus })}>{WORKFLOW_STATUSES.map((status) => <option key={status}>{status}</option>)}</select></label>
       {dateKey && <label>{dateLabel}<input type="date" value={String((item as unknown as Record<string, unknown>)[dateKey] ?? "")} onChange={(event) => onChange({ ...item, [dateKey]: event.target.value || null })} /></label>}
       <label>Assigned person<select value={item.assignedTo} onChange={(event) => onChange({ ...item, assignedTo: event.target.value })}>{assignees.map((name: string) => <option key={name}>{name}</option>)}</select></label>
-      <label>Notes<textarea rows={3} value={item.notes} onChange={(event) => onChange({ ...item, notes: event.target.value })} /></label>
-    </section>
-  );
-}
-
-function SimpleSection({ title, item, onChange }: { title: string; item: XCelligenceWorkflow; onChange: (item: XCelligenceWorkflow) => void }) {
-  return (
-    <section className="workflow-card">
-      <header><h4>{title}</h4><StatusBadge status={item.status} /></header>
-      <label>Status<select value={item.status} onChange={(event) => onChange({ ...item, status: event.target.value as WorkflowStatus })}>{WORKFLOW_STATUSES.map((status) => <option key={status}>{status}</option>)}</select></label>
       <label>Notes<textarea rows={3} value={item.notes} onChange={(event) => onChange({ ...item, notes: event.target.value })} /></label>
     </section>
   );

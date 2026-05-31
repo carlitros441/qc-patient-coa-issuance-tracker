@@ -26,7 +26,7 @@ function encodeMessage({ to, subject, body, from }: { to: string[]; subject: str
 const defaultWorkflowSteps = [
   { id: "phenotyping", name: "Phenotyping", type: "core" },
   { id: "requestCells", name: "Request Cells", type: "core" },
-  { id: "xCelligence", name: "XCelligence", type: "core" },
+  { id: "xCelligence", name: "xCELLIGENCE", type: "core" },
   { id: "elisa", name: "ELISA", type: "core" },
   { id: "report", name: "Report", type: "core" }
 ];
@@ -99,7 +99,7 @@ export const sendCoaEmailNotification = onCall(
         "emailNotification.recipients": recipients,
         "emailNotification.subject": subject,
         "emailNotification.lastError": "",
-        overallStatus: "Ready for CoA",
+        overallStatus: "CoA Issued",
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         updatedBy: request.auth.uid
       });

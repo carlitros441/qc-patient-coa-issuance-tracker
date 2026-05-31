@@ -25,12 +25,13 @@ export function Dashboard() {
     const assignments = [
       patient.workflow.phenotyping.assignedTo,
       patient.workflow.requestCells.assignedTo,
+      patient.workflow.xCelligence.assignedTo,
       patient.workflow.elisa.assignedTo,
       patient.workflow.report.assignedTo,
       ...(patient.customAssays ?? []).map((item) => item.assignedTo)
     ];
     return (project === "All" || patient.project === project)
-      && (status === "All" || patient.overallStatus === status || (status === "Withdrawn/Dropout" && patient.overallStatus === "Blocked"))
+      && (status === "All" || patient.overallStatus === status || (status === "Ready for Email" && patient.overallStatus === "Ready for CoA") || (status === "Withdrawn/Dropout" && patient.overallStatus === "Blocked"))
       && (assignee === "All" || assignments.includes(assignee))
       && (!readyOnly || isReadyForEmail(patient, settings.workflowSteps))
       && patient.patientId.toLowerCase().includes(search.toLowerCase());
@@ -41,7 +42,7 @@ export function Dashboard() {
     coExist: patients.filter((patient) => patient.project === "Co-Exist").length,
     care: patients.filter((patient) => patient.project === "CARE").length,
     ready: patients.filter((patient) => isReadyForEmail(patient, settings.workflowSteps)).length,
-    issued: patients.filter((patient) => patient.overallStatus === "CoA Issued").length,
+    issued: patients.filter((patient) => patient.emailNotification.sent || patient.overallStatus === "CoA Issued").length,
     withdrawn: patients.filter((patient) => patient.overallStatus === "Withdrawn/Dropout" || patient.overallStatus === "Blocked").length
   };
 
@@ -97,7 +98,7 @@ function PatientCard({ patient, settings }: { patient: Patient; settings: AppSet
           <h2>{patient.patientId}</h2>
           <p>{patient.project}</p>
         </div>
-        <StatusBadge status={isReadyForEmail(patient, settings.workflowSteps) ? "Ready to Send" : patient.overallStatus === "Blocked" ? "Withdrawn/Dropout" : patient.overallStatus} />
+        <StatusBadge status={isReadyForEmail(patient, settings.workflowSteps) ? "Ready to Send" : patient.overallStatus === "Blocked" ? "Withdrawn/Dropout" : patient.overallStatus === "Ready for CoA" ? "Ready for Email" : patient.overallStatus} />
       </div>
       <ProgressBar value={progress} />
       <p className="gating-line">Gating Step: <strong>{getGatingStep(patient, settings.workflowSteps)}</strong></p>

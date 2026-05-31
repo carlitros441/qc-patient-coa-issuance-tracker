@@ -9,7 +9,7 @@ The UI uses an original pastel dollhouse-inspired theme with cat-ear accents and
 - Firebase Authentication sign-in gate.
 - Patient creation with duplicate coded Patient ID prevention.
 - Co-Exist and CARE project assignment.
-- Editable workflow sections for Phenotyping, Request Cells, XCelligence, ELISA, and Report.
+- Editable workflow sections for Phenotyping, Request Cells, xCELLIGENCE, ELISA, and Report.
 - Magda and Nisha color-coded assignment badges.
 - Progress calculation in 20% increments across the five required workflow steps.
 - Ready-for-email detection only when all workflow steps are complete and notification has not been sent.

@@ -75,11 +75,14 @@ export async function createPatient(input: { patientId: string; project: Project
 
 export async function updatePatientInfo(
   patient: Patient,
-  input: { project: Project; overallStatus: OverallStatus; notes: string; userId: string }
+  input: { project: Project; overallStatus: OverallStatus; notes: string; userId: string; workflowSteps?: WorkflowStepTemplate[] }
 ) {
+  const nextStatus = input.overallStatus === "Withdrawn/Dropout"
+    ? "Withdrawn/Dropout"
+    : deriveOverallStatus({ ...patient, overallStatus: input.overallStatus }, input.workflowSteps);
   await updateDoc(doc(db, "patients", patient.id), {
     project: input.project,
-    overallStatus: input.overallStatus,
+    overallStatus: nextStatus,
     notes: input.notes.trim(),
     updatedAt: serverTimestamp(),
     updatedBy: input.userId
@@ -107,6 +110,24 @@ export async function updateWorkflow(
     updatedBy: userId
   });
   await logAudit(patient.id, "Updated workflow", "workflow", { workflow: patient.workflow, customAssays: patient.customAssays ?? [] }, { workflow, customAssays: customAssays ?? [] }, userId);
+}
+
+export async function manuallyConfirmEmailSent(
+  patient: Patient,
+  input: { userId: string; recipients: string[]; subject: string; workflowSteps?: WorkflowStepTemplate[] }
+) {
+  await updateDoc(doc(db, "patients", patient.id), {
+    overallStatus: "CoA Issued",
+    "emailNotification.sent": true,
+    "emailNotification.status": "Sent",
+    "emailNotification.sentAt": serverTimestamp(),
+    "emailNotification.recipients": input.recipients,
+    "emailNotification.subject": input.subject,
+    "emailNotification.lastError": "",
+    updatedAt: serverTimestamp(),
+    updatedBy: input.userId
+  });
+  await logAudit(patient.id, "Manually confirmed email notification sent", "emailNotification", patient.emailNotification, { status: "Sent", sent: true }, input.userId);
 }
 
 export async function logAudit(

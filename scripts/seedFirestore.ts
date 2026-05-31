@@ -16,7 +16,7 @@ const patients = [
     workflow: {
       phenotyping: { status: "Completed", performedDate: "2026-05-20", assignedTo: "Magda", notes: "" },
       requestCells: { status: "Completed", requestedDate: "2026-05-21", assignedTo: "Nisha", notes: "" },
-      xCelligence: { status: "In Process", notes: "" },
+      xCelligence: { status: "In Process", assignedTo: "Magda", notes: "" },
       elisa: { status: "Not Started", assignedTo: "Magda", notes: "" },
       report: { status: "Not Started", assignedTo: "Nisha", notes: "" }
     },
@@ -26,12 +26,12 @@ const patients = [
     patientId: "PT-002",
     patientIdLower: "pt-002",
     project: "CARE",
-    overallStatus: "Ready for CoA",
+    overallStatus: "Ready for Email",
     notes: "Ready example.",
     workflow: {
       phenotyping: { status: "Completed", performedDate: "2026-05-18", assignedTo: "Nisha", notes: "" },
       requestCells: { status: "Completed", requestedDate: "2026-05-18", assignedTo: "Magda", notes: "" },
-      xCelligence: { status: "Completed", notes: "" },
+      xCelligence: { status: "Completed", assignedTo: "Magda", notes: "" },
       elisa: { status: "Completed", assignedTo: "Nisha", notes: "" },
       report: { status: "Completed", assignedTo: "Magda", notes: "" }
     },
@@ -52,7 +52,7 @@ Completed items:
 
 * Phenotyping
 * Request Cells
-* XCelligence
+* xCELLIGENCE
 * ELISA
 * Report
 
