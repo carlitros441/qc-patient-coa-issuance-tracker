@@ -10,6 +10,7 @@ export type UserRole = "Admin" | "QC User" | "Viewer";
 export interface AssignedWorkflowItem {
   status: WorkflowStatus;
   assignedTo: Assignee;
+  scheduledDate: string | null;
   notes: string;
 }
 
@@ -36,6 +37,7 @@ export interface CustomAssayWorkflow {
   name: string;
   status: WorkflowStatus;
   assignedTo: Assignee;
+  scheduledDate: string | null;
   notes: string;
 }
 

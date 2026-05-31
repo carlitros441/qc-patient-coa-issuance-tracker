@@ -43,27 +43,32 @@ export const defaultWorkflow = (): PatientWorkflow => ({
     status: "Not Started",
     performedDate: null,
     assignedTo: "Magda",
+    scheduledDate: null,
     notes: ""
   },
   requestCells: {
     status: "Not Started",
     requestedDate: null,
     assignedTo: "Nisha",
+    scheduledDate: null,
     notes: ""
   },
   xCelligence: {
     status: "Not Started",
     assignedTo: "Magda",
+    scheduledDate: null,
     notes: ""
   },
   elisa: {
     status: "Not Started",
     assignedTo: "Magda",
+    scheduledDate: null,
     notes: ""
   },
   report: {
     status: "Not Started",
     assignedTo: "Nisha",
+    scheduledDate: null,
     notes: ""
   }
 });

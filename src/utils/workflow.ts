@@ -116,6 +116,7 @@ export function mergeCustomAssays(
       name: step.name,
       status: "Not Started" as const,
       assignedTo: defaultAssignee,
+      scheduledDate: null,
       notes: ""
     };
   });

@@ -32,7 +32,8 @@ export function PatientDetail({ user }: { user: User }) {
           ...nextPatient.workflow,
           xCelligence: {
             ...nextPatient.workflow.xCelligence,
-            assignedTo: nextPatient.workflow.xCelligence.assignedTo ?? "Magda"
+            assignedTo: nextPatient.workflow.xCelligence.assignedTo ?? "Magda",
+            scheduledDate: nextPatient.workflow.xCelligence.scheduledDate ?? null
           }
         });
       }
@@ -248,10 +249,10 @@ function WorkflowEditor({
     <div className="workflow-grid">
       {workflowSteps.map((step) => {
         if (step.id === "phenotyping") {
-          return <AssignedSection key={step.id} title={step.name} item={workflow.phenotyping} dateKey="performedDate" dateLabel="Date assay performed" assignees={assignees} onChange={(item) => setWorkflow({ ...workflow, phenotyping: item })} />;
+          return <AssignedSection key={step.id} title={step.name} item={workflow.phenotyping} assignees={assignees} onChange={(item) => setWorkflow({ ...workflow, phenotyping: item })} />;
         }
         if (step.id === "requestCells") {
-          return <AssignedSection key={step.id} title={step.name} item={workflow.requestCells} dateKey="requestedDate" dateLabel="Date cells requested" assignees={assignees} onChange={(item) => setWorkflow({ ...workflow, requestCells: item })} />;
+          return <AssignedSection key={step.id} title={step.name} item={workflow.requestCells} assignees={assignees} onChange={(item) => setWorkflow({ ...workflow, requestCells: item })} />;
         }
         if (step.id === "xCelligence") {
           return <AssignedSection key={step.id} title={step.name} item={workflow.xCelligence} assignees={assignees} onChange={(item) => setWorkflow({ ...workflow, xCelligence: item })} />;
@@ -286,17 +287,20 @@ interface AssignedSectionProps<T extends DatedAssignedWorkflowItem> {
   item: T;
   onChange: (item: T) => void;
   assignees: string[];
-  dateKey?: "performedDate" | "requestedDate";
-  dateLabel?: string;
 }
 
-function AssignedSection<T extends DatedAssignedWorkflowItem>({ title, item, onChange, assignees, dateKey, dateLabel }: AssignedSectionProps<T>) {
+function getScheduleDate(item: DatedAssignedWorkflowItem) {
+  const legacyDates = item as DatedAssignedWorkflowItem & { performedDate?: string | null; requestedDate?: string | null };
+  return item.scheduledDate ?? legacyDates.performedDate ?? legacyDates.requestedDate ?? "";
+}
+
+function AssignedSection<T extends DatedAssignedWorkflowItem>({ title, item, onChange, assignees }: AssignedSectionProps<T>) {
   return (
     <section className="workflow-card">
       <header><h4>{title}</h4><AssigneeBadge assignee={item.assignedTo} /></header>
       <label>Status<select value={item.status} onChange={(event) => onChange({ ...item, status: event.target.value as WorkflowStatus })}>{WORKFLOW_STATUSES.map((status) => <option key={status}>{status}</option>)}</select></label>
-      {dateKey && <label>{dateLabel}<input type="date" value={String((item as unknown as Record<string, unknown>)[dateKey] ?? "")} onChange={(event) => onChange({ ...item, [dateKey]: event.target.value || null })} /></label>}
-      <label>Assigned person<select value={item.assignedTo} onChange={(event) => onChange({ ...item, assignedTo: event.target.value })}>{assignees.map((name: string) => <option key={name}>{name}</option>)}</select></label>
+      <label>Schedule Date<input type="date" value={getScheduleDate(item)} onChange={(event) => onChange({ ...item, scheduledDate: event.target.value || null })} /></label>
+      <label>Analyst<select value={item.assignedTo} onChange={(event) => onChange({ ...item, assignedTo: event.target.value })}>{assignees.map((name: string) => <option key={name}>{name}</option>)}</select></label>
       <label>Notes<textarea rows={3} value={item.notes} onChange={(event) => onChange({ ...item, notes: event.target.value })} /></label>
     </section>
   );

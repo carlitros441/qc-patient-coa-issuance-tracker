@@ -1,5 +1,5 @@
 import { onAuthStateChanged, signInWithEmailAndPassword, signOut, type User } from "firebase/auth";
-import { ClipboardCheck, Home, LogOut, PlusCircle, Settings, Sparkles } from "lucide-react";
+import { CalendarDays, ClipboardCheck, Home, LogOut, PlusCircle, Settings, Sparkles } from "lucide-react";
 import { FormEvent, useEffect, useState } from "react";
 import { NavLink, Navigate, Route, Routes } from "react-router-dom";
 import { auth } from "./firebase";
@@ -7,6 +7,7 @@ import { isFirebaseConfigured, missingFirebaseEnv } from "./firebase";
 import { AdminSettings } from "./pages/AdminSettings";
 import { AddPatient } from "./pages/AddPatient";
 import { Dashboard } from "./pages/Dashboard";
+import { CalendarView } from "./pages/CalendarView";
 import { PatientDetail } from "./pages/PatientDetail";
 
 export interface AuthContextValue {
@@ -68,6 +69,7 @@ function Shell({ user }: AuthContextValue) {
         </div>
         <nav>
           <NavLink to="/"><Home size={18} />Dashboard</NavLink>
+          <NavLink to="/calendar"><CalendarDays size={18} />Calendar</NavLink>
           <NavLink to="/patients/new"><PlusCircle size={18} />Add Patient</NavLink>
           <NavLink to="/admin"><Settings size={18} />Admin Settings</NavLink>
         </nav>
@@ -82,6 +84,7 @@ function Shell({ user }: AuthContextValue) {
         </header>
         <Routes>
           <Route path="/" element={<Dashboard />} />
+          <Route path="/calendar" element={<CalendarView />} />
           <Route path="/patients/new" element={<AddPatient user={user} />} />
           <Route path="/patients/:id" element={<PatientDetail user={user} />} />
           <Route path="/admin" element={<AdminSettings user={user} />} />
